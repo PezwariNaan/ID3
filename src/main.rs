@@ -46,7 +46,7 @@ impl Table {
 trait ID3 {
     fn calculate_probability(&self, column: &str, value: ValueTypes) -> f64;
     fn calculate_entropy(&self, column: &str) -> f64;
-    fn calculate_information_gain(&self);
+    fn calculate_information_gain(&self, column: &str) -> f64;
     fn generate_tree(&self);
 }
 
@@ -83,9 +83,11 @@ impl ID3 for Table {
             }).sum()
     }
 
-    fn calculate_information_gain(&self) {
-        println!("Calculating Info Gain :)");
-        return 
+    fn calculate_information_gain(&self, column: &str) ->f64 {
+        let entropy = self.calculate_entropy(column);
+
+
+        return entropy
     }
 
     fn generate_tree(&self) {
