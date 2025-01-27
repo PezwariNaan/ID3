@@ -44,7 +44,7 @@ impl Table {
 
 trait ID3 {
     fn calculate_probability(&self, column: &str, value: ValueTypes) -> f64;
-    fn calculate_entropy(&self, column: &str) -> f64;
+    fn calculate_entropy(&self, column: Option<&str>) -> f64;
     fn calculate_information_gain(&self, column: &str) -> f64;
     fn generate_tree(&self);
 }
@@ -62,28 +62,63 @@ impl ID3 for Table {
         return  count / total_instances
     }
 
-    fn calculate_entropy(&self, column: &str) -> f64 {
-        let unique_values = match column {
-            "slope" => self.get_unique("slope"),
-            "elevation" => self.get_unique("elevation"),
-            "stream" => self.get_unique("stream"),
-            _ => panic!("Invalid Column Name :("),
-        };
+    fn calculate_entropy(&self, column: Option<&str>) -> f64 {
+        match column {
+            Some("slope") => {
+                let unique_values = self.get_unique("slope");
+                unique_values
+                    .iter()
+                    .map(|&value| {
+                        let p = self.calculate_probability("slope", value);
+                        if p > 0.0 {
+                            -p * p.log2()
+                        } else {
+                            0.0
+                        }
+                    }).sum()
+            }
+            Some("elevation") => {
+                let unique_values = self.get_unique("elevation");
+                unique_values
+                .iter()
+                .map(|&value| {
+                    let p = self.calculate_probability("elevation", value);
+                    if p > 0.0 {
+                        -p * p.log2()
+                    } else {
+                        0.0
+                    }
+                }).sum()
+            }
+            Some("stream") => {
+                let unique_values = self.get_unique("stream");
+                unique_values
+                    .iter()
+                    .map(|&value| {
+                        let p = self.calculate_probability("stream", value);
+                        if p > 0.0 {
+                            -p * p.log2()
+                        } else {
+                            0.0
+                        }
+                    }).sum()
+            }
+            None => {
+                let slope_entropy = self.calculate_entropy(Some("slope"));
+                let elevation_entropy = self.calculate_entropy(Some("elevation"));
+                let stream_entropy = self.calculate_entropy(Some("stream"));
 
-        return unique_values
-            .iter()
-            .map(|&value| {
-              let p = self.calculate_probability(column, value);
-              if p > 0.0 {
-                -p * p.log2()
-              } else {
-                0.0
-              }
-            }).sum()
+                return slope_entropy + elevation_entropy + stream_entropy
+            }
+
+            _ => {
+                panic!("Invalid Column Name :(");
+            }
+        }
     }
 
     fn calculate_information_gain(&self, column: &str) ->f64 {
-        let overall_entropy = self.calculate_entropy(column);
+        let overall_entropy = self.calculate_entropy(None);
         let unique_values = self.get_unique(column);
         let total_instances = self.id.len() as f64;
 
@@ -97,7 +132,7 @@ impl ID3 for Table {
                     _ => panic!("Invalid Column Name :("),
                 } as f64;
 
-                let subset_entropy = self.calculate_entropy(column);
+                let subset_entropy = self.calculate_entropy(Some(column));
 
                 println!("{} / {} * {}", subset_size, total_instances, subset_entropy);
 
@@ -118,8 +153,7 @@ impl ID3 for Table {
 fn main() {
     let veg_table = Table::new();
     
-    let information_gain = veg_table.calculate_information_gain("slope");
-    println!("{:?}", information_gain);
+    let entropy = veg_table.calculate_information_gain("slope");
     return
 }
 
