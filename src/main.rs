@@ -40,7 +40,6 @@ impl Table {
         
         return unique_values
     }
-
 }
 
 trait ID3 {
@@ -84,10 +83,30 @@ impl ID3 for Table {
     }
 
     fn calculate_information_gain(&self, column: &str) ->f64 {
-        let entropy = self.calculate_entropy(column);
+        let overall_entropy = self.calculate_entropy(column);
+        let unique_values = self.get_unique(column);
+        let total_instances = self.id.len() as f64;
 
+        let weighted_entropy: f64 = unique_values
+            .iter()
+            .map(|&value| {
+                let subset_size = match column {
+                    "slope" => self.slope.iter().filter(|&&v| ValueTypes::Str(v) == value).count(),
+                    "elevation" => self.elevation.iter().filter(|&&v| ValueTypes::Str(v) == value).count(),
+                    "stream" => self.stream.iter().filter(|&&v| ValueTypes::Bool(v) == value).count(),
+                    _ => panic!("Invalid Column Name :("),
+                } as f64;
 
-        return entropy
+                let subset_entropy = self.calculate_entropy(column);
+
+                println!("{} / {} * {}", subset_size, total_instances, subset_entropy);
+
+                (subset_size / total_instances) * subset_entropy
+            }).sum();
+
+        println!("{} - {}", overall_entropy, weighted_entropy);
+
+        return overall_entropy - weighted_entropy
     }
 
     fn generate_tree(&self) {
@@ -99,9 +118,8 @@ impl ID3 for Table {
 fn main() {
     let veg_table = Table::new();
     
-    let entropy = veg_table.calculate_entropy("elevation");
-    println!("{:?}", entropy);
-
+    let information_gain = veg_table.calculate_information_gain("slope");
+    println!("{:?}", information_gain);
     return
 }
 
