@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 enum TableType {
     Int(i32),
     Str(&'static str),
@@ -42,20 +42,51 @@ impl Table {
             vegetation: ["chapparal", "riparian", "riparian", "chapparal", "conifer", "conifer", "chapparal"].map(Into::into),
         }
     }
+
+    fn get_unique(&self, column: &str) -> Vec<TableType> {
+        let mut values: Vec<TableType> = match column {
+            "stream" => self.stream.iter().cloned().collect(),
+            "slope" => self.slope.iter().cloned().collect(),
+            "elevation" => self.elevation.iter().cloned().collect(),
+            _ => panic!("Invalid Column: {}", column),
+        };
+        
+        values.sort();
+        values.dedup();
+        return values
+    }
 }
 
 trait ID3 {
-    fn calculate_probability(&self) -> f32;
-    fn calculate_entropy(&self, column: TableType) -> f32;
-    fn calculate_information_gain(&self, column: TableType, value: TableType) -> f32;
-    fn build_tree(&self);
+    fn calculate_probability(&self, column: &str, value: TableType) -> f64;
+    //fn calculate_entropy(&self, column: &str) -> f64;
+    //fn calculate_information_gain(&self, column: &str, value: TableType) -> f64;
+    //fn partition_table(&self) -> Table;
+    //fn build_tree(&self);
+}
+
+impl ID3 for Table {
+    fn calculate_probability(&self, column: &str, value: TableType) -> f64 {
+        let count = match column {
+            "stream" => self.stream.iter().filter(|&v| v == &value).count(),
+            "slope" => self.slope.iter().filter(|&v| v == &value).count(),
+            "elevation" => self.elevation.iter().filter(|&v| v == &value).count(),
+            _ => panic!("Invalid Column: {}", column),
+        };
+
+        count as f64 / self.id.len() as f64
+    }
+    //fn calculate_entropy(&self, column: TableType) -> f32 {}
+    //fn calculate_information_gain(&self, column: TableType, value: TableType) ->f32 {}
+    //fn partition_table(&self) -> Table {}
+    //fn build_tree(&self) {}
 }
 
 fn main() {
     let veg_table = Table::new();
-
-    let streams: Vec<&TableType> = veg_table.stream.iter().collect();
-    println!("{:?}", streams);
+    
+    let probability = veg_table.calculate_probability("elevation", TableType::Str("low"));
+    println!("Probability elevation is highest: {}", probability);
 
     return
 }
