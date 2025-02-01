@@ -48,6 +48,7 @@ impl Table {
             "stream" => self.stream.iter().cloned().collect(),
             "slope" => self.slope.iter().cloned().collect(),
             "elevation" => self.elevation.iter().cloned().collect(),
+            "vegetation" => self.vegetation.iter().cloned().collect(),
             _ => panic!("Invalid Column: {}", column),
         };
         
@@ -59,8 +60,8 @@ impl Table {
 
 trait ID3 {
     fn calculate_probability(&self, column: &str, value: TableType) -> f64;
-    //fn calculate_entropy(&self, column: &str) -> f64;
-    //fn calculate_information_gain(&self, column: &str, value: TableType) -> f64;
+    fn calculate_entropy(&self, column: &str) -> f64;
+    fn calculate_information_gain(&self, column: &str, value: TableType) -> f64;
     //fn partition_table(&self) -> Table;
     //fn build_tree(&self);
 }
@@ -74,19 +75,90 @@ impl ID3 for Table {
             _ => panic!("Invalid Column: {}", column),
         };
 
-        count as f64 / self.id.len() as f64
+        return count as f64 / self.id.len() as f64
     }
-    //fn calculate_entropy(&self, column: TableType) -> f32 {}
-    //fn calculate_information_gain(&self, column: TableType, value: TableType) ->f32 {}
+
+    fn calculate_entropy(&self, column: &str) -> f64 {
+        let mut entropy = 0.0;
+        let unique_values = match column {
+            "stream" => self.get_unique("stream"),
+            "slope" => self.get_unique("slope"),
+            "elevation" => self.get_unique("elevation"),
+            _ => panic!("Invalid Column :("),
+        };
+    
+        for &value in &unique_values {
+            let p = self.calculate_probability(column, value);
+            if p > 0.0 {
+                entropy += p * -p.log2();
+            }
+        }
+
+        return entropy
+    }
+    
+    fn calculate_information_gain(&self, column: &str, value: TableType) ->f64 {
+        let entropy = self.calculate_entropy(column);
+
+        let partition_indices: Vec<usize> = match column {
+            "stream" => self
+                .stream
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            "slope" => self
+                .slope
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            "elevation" => self
+                .elevation
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            _ => panic!("Invalid Column :("),
+        };
+
+        let partition_size = partition_indices.len() as f64;
+        let total_size = self.id.len() as f64;
+
+        if partition_size == 0.0 {
+            return 0.0
+        }
+
+        let mut partition_entropy = 0.0;
+        let unique_vegetation = self.get_unique("vegetation");
+
+        for veg in unique_vegetation {
+            let count = partition_indices
+                .iter()
+                .filter(|&&i| self.vegetation[i] == veg)
+                .count() as f64;
+
+            if count > 0.0 {
+                let p = count / partition_size;
+                partition_entropy += p * -p.log2();
+            }
+        }
+
+        let weighted_partition_entropy = (partition_size / total_size) * partition_entropy;
+        entropy - weighted_partition_entropy
+    }
     //fn partition_table(&self) -> Table {}
     //fn build_tree(&self) {}
 }
 
 fn main() {
     let veg_table = Table::new();
-    
-    let probability = veg_table.calculate_probability("elevation", TableType::Str("low"));
-    println!("Probability elevation is highest: {}", probability);
+
+    let information_gain = veg_table.calculate_information_gain("elevation", TableType::Str("high"));
+    println!("{}", information_gain);
 
     return
 }
