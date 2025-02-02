@@ -6,6 +6,17 @@ enum TableType {
 }
 
 #[derive(Debug)]
+enum DecisionTree {
+    Leaf(TableType),
+    Node {
+        feature: String,
+        value: TableType,
+        children: Vec<DecisionTree>,
+    },
+}
+
+
+#[derive(Debug)]
 struct Table {
     id: Vec<TableType>,
     stream: Vec<TableType>,
@@ -13,7 +24,6 @@ struct Table {
     elevation: Vec<TableType>,
     vegetation: Vec<TableType>,
 }
-
 
 impl From<i32> for TableType {
     fn from(value: i32) -> Self {
@@ -92,7 +102,7 @@ trait ID3 {
     fn calculate_entropy(&self, column: &str) -> f64;
     fn calculate_information_gain(&self, column: &str, value: TableType) -> f64;
     fn partition_table(&self) -> (String, Vec<Table>);
-    //fn build_tree(&self);
+    fn build_tree(&self) -> DecisionTree;
 }
 
 impl ID3 for Table {
@@ -197,17 +207,52 @@ impl ID3 for Table {
         return (best_feature.to_string(), partitions)
     }
 
-    //fn build_tree(&self) {}
+    fn build_tree(&self) -> DecisionTree {
+       let unique_vegetation = self.get_unique("vegetation");
+       if unique_vegetation.len() == 1 { // Base case 1: Only one target feature
+            return DecisionTree::Leaf(unique_vegetation[0])
+       }
+
+       let features = ["stream", "slope", "elevation"];
+       if features.is_empty() { // Base case 2: No features
+            let most_common = self
+                .vegetation
+                .iter()
+                .max_by_key(|&v| self.vegetation.iter().filter(|&x| x == v).count())
+                .unwrap();
+           return DecisionTree::Leaf(*most_common)
+       }
+
+       let (best_feature, partitions) = self.partition_table();
+
+       if partitions.is_empty() { // Base case 3: Empty dataset
+            let most_common = self
+                .vegetation
+                .iter()
+                .max_by_key(|&v| self.vegetation.iter().filter(|&x|x == v).count())
+                .unwrap();
+           return DecisionTree::Leaf(*most_common)
+       }
+        
+       let mut children = Vec::new();
+       for partition in partitions {
+            let child_tree = partition.build_tree();
+            children.push(child_tree);
+       }
+
+       DecisionTree::Node {
+            feature: best_feature.clone(),
+            value: self.get_unique(&best_feature)[0],
+            children,
+       }
+    }
 }
 
 fn main() {
     let veg_table = Table::new();
 
-    let (best_feature, partitions) = veg_table.partition_table();
-    println!("Best Feature: {}", best_feature);
-    for (i, partition) in partitions.iter().enumerate() {
-        println!("Partition {}:{:?}", i + 1, partition.vegetation);
-    }
+    let decision_tree: DecisionTree = veg_table.build_tree();
+    println!("{:#?}", decision_tree);
 
     return
 }
