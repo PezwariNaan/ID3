@@ -43,6 +43,22 @@ impl From <&'static str> for TableType {
     }
 }
 
+fn print_tree(tree: &DecisionTree, depth: usize) {
+    let indent = " ".repeat(depth);
+    match tree {
+        DecisionTree::Leaf(value) => {
+            println!("{}Leaf: {:?}", indent, value);
+        },
+        
+        DecisionTree::Node {feature, value, children} => {
+            println!("{}Node: {} = {:?}", indent, feature, value);
+            for child in children {
+                print_tree(child, depth + 4);
+            }
+        }
+    }
+}
+
 impl Table {
     fn new() -> Self {
         Self {
@@ -252,7 +268,7 @@ fn main() {
     let veg_table = Table::new();
 
     let decision_tree: DecisionTree = veg_table.build_tree();
-    println!("{:#?}", decision_tree);
+    print_tree(&decision_tree, 4);
 
     return
 }
