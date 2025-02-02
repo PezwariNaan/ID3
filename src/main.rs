@@ -5,12 +5,13 @@ enum TableType {
     Bool(bool),
 }
 
+#[derive(Debug)]
 struct Table {
-    id: [TableType; 7],
-    stream: [TableType; 7],
-    slope: [TableType; 7],
-    elevation: [TableType; 7],
-    vegetation: [TableType; 7],
+    id: Vec<TableType>,
+    stream: Vec<TableType>,
+    slope: Vec<TableType>,
+    elevation: Vec<TableType>,
+    vegetation: Vec<TableType>,
 }
 
 
@@ -35,11 +36,11 @@ impl From <&'static str> for TableType {
 impl Table {
     fn new() -> Self {
         Self {
-            id: [1, 2, 3, 4, 5, 6, 7].map(Into::into),
-            stream: [false, true, true, false, false, true, true].map(Into::into),
-            slope: ["steep", "moderate", "steep", "steep", "flat", "steep", "steep"].map(Into::into),
-            elevation: ["high", "low", "medium", "medium", "high", "highest", "high"].map(Into::into),
-            vegetation: ["chapparal", "riparian", "riparian", "chapparal", "conifer", "conifer", "chapparal"].map(Into::into),
+            id: vec![1, 2, 3, 4, 5, 6, 7].into_iter().map(Into::into).collect(),
+            stream: vec![false, true, true, false, false, true, true].into_iter().map(Into::into).collect(),
+            slope: vec!["steep", "moderate", "steep", "steep", "flat", "steep", "steep"].into_iter().map(Into::into).collect(),
+            elevation: vec!["high", "low", "medium", "medium", "high", "highest", "high"].into_iter().map(Into::into).collect(),
+            vegetation: vec!["chapparal", "riparian", "riparian", "chapparal", "conifer", "conifer", "chapparal"].into_iter().map(Into::into).collect(),
         }
     }
 
@@ -56,13 +57,41 @@ impl Table {
         values.dedup();
         return values
     }
+
+    fn get_indices(&self, feature: &str, value: TableType) -> Vec<usize> {
+        let indices: Vec<usize> = match feature {
+            "stream" => self
+                .stream
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            "slope" => self
+                .slope
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            "elevation" => self
+                .elevation
+                .iter()
+                .enumerate()
+                .filter(|&(_, &v)| v == value)
+                .map(|(i, _)| i)
+                .collect(),
+            _ => panic!("Invalid Feature: {}", feature),
+        };
+        return indices
+    }
 }
 
 trait ID3 {
     fn calculate_probability(&self, column: &str, value: TableType) -> f64;
     fn calculate_entropy(&self, column: &str) -> f64;
     fn calculate_information_gain(&self, column: &str, value: TableType) -> f64;
-    //fn partition_table(&self) -> Table;
+    fn partition_table(&self) -> (String, Vec<Table>);
     //fn build_tree(&self);
 }
 
@@ -99,32 +128,7 @@ impl ID3 for Table {
     
     fn calculate_information_gain(&self, column: &str, value: TableType) ->f64 {
         let entropy = self.calculate_entropy(column);
-
-        let partition_indices: Vec<usize> = match column {
-            "stream" => self
-                .stream
-                .iter()
-                .enumerate()
-                .filter(|&(_, &v)| v == value)
-                .map(|(i, _)| i)
-                .collect(),
-            "slope" => self
-                .slope
-                .iter()
-                .enumerate()
-                .filter(|&(_, &v)| v == value)
-                .map(|(i, _)| i)
-                .collect(),
-            "elevation" => self
-                .elevation
-                .iter()
-                .enumerate()
-                .filter(|&(_, &v)| v == value)
-                .map(|(i, _)| i)
-                .collect(),
-            _ => panic!("Invalid Column :("),
-        };
-
+        let partition_indices: Vec<usize> = self.get_indices(column, value);
         let partition_size = partition_indices.len() as f64;
         let total_size = self.id.len() as f64;
 
@@ -148,17 +152,62 @@ impl ID3 for Table {
         }
 
         let weighted_partition_entropy = (partition_size / total_size) * partition_entropy;
-        entropy - weighted_partition_entropy
+        return entropy - weighted_partition_entropy
     }
-    //fn partition_table(&self) -> Table {}
+
+    fn partition_table(&self) -> (String, Vec<Table>) {
+        let features = ["stream", "slope", "elevation"];
+        let mut best_gain = 0.0;
+        let mut best_feature = "";
+
+        for &feature in &features {
+            let unique_values = self.get_unique(feature);
+            let mut feature_gain = 0.0;
+
+            for &value in &unique_values {
+                let gain = self.calculate_information_gain(feature, value);
+                feature_gain += gain;
+            }
+
+            let avg_gain = feature_gain / unique_values.len() as f64;
+
+            if avg_gain > best_gain {
+                best_gain = avg_gain;
+                best_feature = feature;
+            }
+        }
+
+        let unique_values = self.get_unique(best_feature);
+        let mut partitions = Vec::new();
+
+        for &value in &unique_values {
+            let indices: Vec<usize> = self.get_indices(best_feature, value);
+
+            let partition = Table {
+                id: indices.iter().map(|&i| self.id[i]).collect(),
+                stream: indices.iter().map(|&i| self.stream[i]).collect(),
+                slope: indices.iter().map(|&i| self.slope[i]).collect(),
+                elevation: indices.iter().map(|&i| self.elevation[i]).collect(),
+                vegetation: indices.iter().map(|&i| self.vegetation[i]).collect(),
+            };
+            
+            partitions.push(partition);
+        }
+
+        return (best_feature.to_string(), partitions)
+    }
+
     //fn build_tree(&self) {}
 }
 
 fn main() {
     let veg_table = Table::new();
 
-    let information_gain = veg_table.calculate_information_gain("elevation", TableType::Str("high"));
-    println!("{}", information_gain);
+    let (best_feature, partitions) = veg_table.partition_table();
+    println!("Best Feature: {}", best_feature);
+    for (i, partition) in partitions.iter().enumerate() {
+        println!("Partition {}:{:?}", i + 1, partition.vegetation);
+    }
 
     return
 }
